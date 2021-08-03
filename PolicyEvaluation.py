@@ -29,18 +29,19 @@ def policy_eval(policy, env, discount_factor=1.0, theta=0.00001):
     """
     # Start with a random (all 0) value function
     V = np.zeros(env.nS)
+
     while True:
         delta = 0
         for i in range(1,env.nS):
             v = V[i]
             newv = 0
-            for j in range(env.nA):
+            for j in range(len(policy[i])):
                 prob, next_state, reward, done = env.P[i][j][0]
-                newv += prob*(reward+discount_factor*V[next_state])
+                newv += policy[i,j]*prob*(reward+discount_factor*V[next_state])
                 print(V)
             V[i] = newv
             delta = max(delta,abs(v-V[i]))
-            print(delta)
+            #print(delta)
         if delta < theta:
             break
 
