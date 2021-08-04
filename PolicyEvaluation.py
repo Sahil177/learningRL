@@ -32,7 +32,7 @@ def policy_eval(policy, env, discount_factor=1.0, theta=0.00001):
 
     while True:
         delta = 0
-        for i in range(1,env.nS):
+        for i in range(env.nS):
             v = V[i]
             newv = 0
             for j in range(len(policy[i])):
