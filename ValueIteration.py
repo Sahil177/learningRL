@@ -66,3 +66,7 @@ print("")
 print("Reshaped Grid Value Function:")
 print(v.reshape(env.shape))
 print("")
+
+# Test the value function
+expected_v = np.array([ 0, -1, -2, -3, -1, -2, -3, -2, -2, -3, -2, -1, -3, -2, -1,  0])
+np.testing.assert_array_almost_equal(v, expected_v, decimal=2)
