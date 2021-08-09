@@ -15,27 +15,26 @@ def value_iteration_for_gamblers(p_h, theta=0.0001, discount_factor=1.0):
     rewards = np.zeros(101)
     rewards[100] = 1
     
-    i =0 
 
-    while i<1000:
+    while True:
         delta = 0
         for s in range(1,100):
             v = V[s]
             action_vals = []
             for a in range(min(s, 100-s)+1):
                 action_vals.append(p_h*(rewards[s+a]+discount_factor*V[s+a])+(1-p_h)*(rewards[s-a]+discount_factor*V[s-a]))
-            best_action = np.argmax(action_vals)
+            action_vals = np.array(action_vals)
+            best_action = np.argmax(action_vals) #np.random.choice(np.flatnonzero(action_vals == action_vals.max())) np.argmax(action_vals)
             policy[s] = np.eye(99)[best_action]
             V[s] = action_vals[best_action]
             delta = max(delta,abs(v-V[s]))
-        i +=1
-        '''if delta < theta:
-            break'''
-
+        if delta < theta:
+            break
+    
     return policy, V
 
 
-policy, v = value_iteration_for_gamblers(0.4)
+policy, v = value_iteration_for_gamblers(0.55)
 
 print([np.argmax(pol) for pol in policy])
 
