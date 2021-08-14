@@ -38,7 +38,6 @@ def policy_eval(policy, env, discount_factor=1.0, theta=0.00001):
             for j in range(len(policy[i])):
                 prob, next_state, reward, done = env.P[i][j][0]
                 newv += policy[i,j]*prob*(reward+discount_factor*V[next_state])
-                print(V)
             V[i] = newv
             delta = max(delta,abs(v-V[i]))
             #print(delta)
