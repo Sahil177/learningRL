@@ -5,11 +5,13 @@ from matplotlib.pyplot import figure, draw, pause
 import numpy as np
 from collections import defaultdict
 import time
-from lib import plotting
 matplotlib.style.use('ggplot')
 import operator
-
 import pickle
+
+import os 
+dir_path = os.path.dirname(os.path.realpath(__file__))
+
 
 fg = figure()
 ax = fg.gca()
@@ -30,37 +32,37 @@ h = ax.imshow(grid)
 #Setting up environment
 
 rows = [ (0,13), 
-         (0,14), 
-         (0,14), 
-         (0,15), 
-         (0,16), 
-         (0,16), 
-         (7,16), 
-         (8,16), 
-         (8,16), 
-         (8,16), 
-         (8,16), 
-         (8,16), 
-         (8,16), 
-         (8,16),
-         (8,15),
-         (8,15),
-         (8,15),
-         (8,15),
-         (8,15),
-         (8,15),
-         (8,15),
-         (8,15),
-         (8,14),
-         (8,14),
-         (8,14),
-         (8,14),
-         (8,14),
-         (8,14),
-         (8,14),
-         (8,13),
-         (8,13),
-         (8,13)]
+        (0,14), 
+        (0,14), 
+        (0,15), 
+        (0,16), 
+        (0,16), 
+        (7,16), 
+        (8,16), 
+        (8,16), 
+        (8,16), 
+        (8,16), 
+        (8,16), 
+        (8,16), 
+        (8,16),
+        (8,15),
+        (8,15),
+        (8,15),
+        (8,15),
+        (8,15),
+        (8,15),
+        (8,15),
+        (8,15),
+        (8,14),
+        (8,14),
+        (8,14),
+        (8,14),
+        (8,14),
+        (8,14),
+        (8,14),
+        (8,13),
+        (8,13),
+        (8,13)]
 
 start = [(len(rows)-1, i) for i in range(rows[-1][0], rows[-1][1]+1)]
 
@@ -84,7 +86,7 @@ class RaceTrackenv:
         self.end = {e:1 for e in end}
         self.grid = grid
         self.grid_dict = grid_dict
-        self.action_space = [(i,j) for i in [-1,0,1] for j in [0,-1,1] if (i,j) != (0,0)]
+        self.action_space = [(i,j) for i in [-1,0,1] for j in [0,-1,1]]
         self.done = False
     
     def reset(self):
@@ -97,8 +99,11 @@ class RaceTrackenv:
         next_pos = tuple(map(lambda x, y: x + y, self.state[0], self.state[1]))
         if next_pos in self.end:
             self.done = True
+
         next_vel = tuple(map(lambda x, y: x + y, self.action_space[action], self.state[1]))
-        next_vel = (clamp(-4,next_vel[0],-1), clamp(-4,next_vel[1],-1))
+        next_vel = (clamp(-4,next_vel[0],0), clamp(-4,next_vel[1],0))
+        if next_vel == (0,0):
+            next_vel = self.state[1]
         if next_pos not in self.grid_dict:
             next_pos = start[np.random.choice(range(len(self.start)))]
             next_vel = (0,0)
@@ -170,7 +175,7 @@ def create_greedy_policy(Q):
 
     return policy_fn
 
-def mc_control_importance_sampling(env, num_episodes, behavior_policy, discount_factor=1.0):
+def mc_control_importance_sampling(env, num_episodes, behavior_policy, Q, discount_factor=1.0 ):
     """
     Monte Carlo Control Off-Policy Control using Weighted Importance Sampling.
     Finds an optimal greedy policy.
@@ -191,18 +196,18 @@ def mc_control_importance_sampling(env, num_episodes, behavior_policy, discount_
     
     # The final action-value function.
     # A dictionary that maps state -> action values
-    Q = defaultdict(lambda: np.zeros(len(env.action_space)))
     C = defaultdict(lambda: np.zeros(len(env.action_space)))
     
     # Our greedily policy we want to learn
     target_policy = create_greedy_policy(Q)
 
     for i_episode in range(num_episodes):
-        if i_episode%100 == 0:
-            print(i_episode)
+
+        #if i_episode%100 == 0 or i_episode == 1:
         #s = time.time()
         state = env.reset()
         episode = []
+        c = 0
         while True:
             action = np.random.choice(range(len(env.action_space)), p=behavior_policy(state))
             next_state, reward, done = env.step(action)
@@ -212,10 +217,12 @@ def mc_control_importance_sampling(env, num_episodes, behavior_policy, discount_
                 break
             state = next_state
             point = state[0]
-            grid[point[0]][point[1]] = 0
-            h.set_data(np.fliplr(grid))
-            draw(), pause(1e-3)
-            grid[point[0]][point[1]] = 1
+            #grid[point[0]][point[1]] = 0
+            #h.set_data(np.fliplr(grid))
+            #draw(), pause(1e-3)
+            #grid[point[0]][point[1]] = 1
+            c +=1
+        print(i_episode, c)
         
         g = 0
         W = 1
@@ -238,21 +245,35 @@ def mc_control_importance_sampling(env, num_episodes, behavior_policy, discount_
 
 
 env = RaceTrackenv(start, end, grid, grid_dict)
+#Q= defaultdict(lambda: np.zeros(len(env.action_space)))
+a_file = open(dir_path + "\Q_dict", "rb")
+Q= defaultdict(lambda: np.zeros(len(env.action_space)),pickle.load(a_file))
 
 
-epsilon_policy = make_epsilon_greedy_policy(0.1, len(env.action_space))
+
+epsilon_policy = make_epsilon_greedy_policy(0.3, len(env.action_space))
+epsilon_policy2 = make_epsilon_greedy_policy(0.1, len(env.action_space))
 random_policy = create_random_policy(len(env.action_space))
-Q, policy = mc_control_importance_sampling(env, num_episodes=1000, behavior_policy=epsilon_policy, discount_factor=0.9)
+Q1, policy = mc_control_importance_sampling(env, num_episodes=1, behavior_policy=epsilon_policy, Q = Q, discount_factor=0.9)
 
+new_Q1 = {key:Q1[key] for key in Q1}
 
-Q_dict = open('Q_dict', 'wb')
-pickle.dump(Q, Q_dict)
+Q_dict = open(dir_path + '\Q_dict', 'wb')
+pickle.dump(new_Q1, Q_dict)
 Q_dict.close()
+'''
+Q2, policy2 = mc_control_importance_sampling(env, num_episodes=100, behavior_policy=epsilon_policy2, Q = Q1, discount_factor=0.9)
+
+new_Q2 = {key:Q2[key] for key in Q2}
+
+Q_dict2 = open('Q_dict2', 'wb')
+pickle.dump(new_Q2, Q_dict2)
+Q_dict2.close()
 
 # For plotting: Create value function from action-value function
 # by picking the best action at each state
 V = defaultdict(float)
-for state, action_values in Q.items():
+for state, action_values in Q2.items():
     action_value = np.max(action_values)
     V[state] = action_value
 
@@ -263,7 +284,7 @@ state = env.reset()
 state = (test_start, (0,0))
 path = []
 while True:
-    action = np.argmax(Q[state])
+    action = np.argmax(Q2[state])
     next_state, reward, done = env.step(action)
     episode.append((tuple(state), action, reward))
     print(np.array((tuple(state), action, reward)))
@@ -281,9 +302,7 @@ for point in path:
 
 plt.imshow(np.fliplr(grid))
 plt.show()
-
-
-
+'''
 
 
 
