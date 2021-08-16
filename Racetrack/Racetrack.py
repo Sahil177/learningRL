@@ -5,13 +5,12 @@ from matplotlib.pyplot import figure, draw, pause
 import numpy as np
 from collections import defaultdict
 import time
-matplotlib.style.use('ggplot')
 import operator
 import pickle
 
 import os 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-
+s = time.time()
 
 fg = figure()
 ax = fg.gca()
@@ -175,7 +174,7 @@ def create_greedy_policy(Q):
 
     return policy_fn
 
-def mc_control_importance_sampling(env, num_episodes, behavior_policy, Q, discount_factor=1.0 ):
+def mc_control_importance_sampling(env, num_episodes, behavior_policy, Q, C, discount_factor=1.0 ):
     """
     Monte Carlo Control Off-Policy Control using Weighted Importance Sampling.
     Finds an optimal greedy policy.
@@ -196,7 +195,6 @@ def mc_control_importance_sampling(env, num_episodes, behavior_policy, Q, discou
     
     # The final action-value function.
     # A dictionary that maps state -> action values
-    C = defaultdict(lambda: np.zeros(len(env.action_space)))
     
     # Our greedily policy we want to learn
     target_policy = create_greedy_policy(Q)
@@ -222,7 +220,8 @@ def mc_control_importance_sampling(env, num_episodes, behavior_policy, Q, discou
             #draw(), pause(1e-3)
             #grid[point[0]][point[1]] = 1
             c +=1
-        print(i_episode, c)
+        if i_episode%500 == 0:
+            print(i_episode, c)
         
         g = 0
         W = 1
@@ -240,7 +239,7 @@ def mc_control_importance_sampling(env, num_episodes, behavior_policy, Q, discou
         #f = time.time()
         #print(f-s)
 
-    return Q, target_policy
+    return Q, C, target_policy
 
 
 
@@ -248,19 +247,31 @@ env = RaceTrackenv(start, end, grid, grid_dict)
 #Q= defaultdict(lambda: np.zeros(len(env.action_space)))
 a_file = open(dir_path + "\Q_dict", "rb")
 Q= defaultdict(lambda: np.zeros(len(env.action_space)),pickle.load(a_file))
+#C = defaultdict(lambda: np.zeros(len(env.action_space)))
+b_file = open(dir_path + "\C_dict", "rb")
+C= defaultdict(lambda: np.zeros(len(env.action_space)),pickle.load(b_file))
 
 
-
-epsilon_policy = make_epsilon_greedy_policy(0.3, len(env.action_space))
+epsilon_policy = make_epsilon_greedy_policy(0.9, len(env.action_space))
 epsilon_policy2 = make_epsilon_greedy_policy(0.1, len(env.action_space))
 random_policy = create_random_policy(len(env.action_space))
-Q1, policy = mc_control_importance_sampling(env, num_episodes=1, behavior_policy=epsilon_policy, Q = Q, discount_factor=0.9)
+Q1,C, policy = mc_control_importance_sampling(env, num_episodes=300000, behavior_policy=epsilon_policy, Q = Q, C = C, discount_factor=0.9)
 
 new_Q1 = {key:Q1[key] for key in Q1}
 
 Q_dict = open(dir_path + '\Q_dict', 'wb')
 pickle.dump(new_Q1, Q_dict)
 Q_dict.close()
+
+new_C = {key:C[key] for key in C}
+
+C_dict = open(dir_path + '\C_dict', 'wb')
+pickle.dump(new_C, C_dict)
+C_dict.close()
+
+f = time.time()
+print(len(new_Q1))
+print(f"Exectuion time: {f-s}")
 '''
 Q2, policy2 = mc_control_importance_sampling(env, num_episodes=100, behavior_policy=epsilon_policy2, Q = Q1, discount_factor=0.9)
 
