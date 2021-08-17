@@ -7,8 +7,17 @@ from collections import defaultdict
 import time
 import operator
 import pickle
-
+import sys
 import os 
+
+if "../" not in sys.path:
+  sys.path.append("../") 
+from lib import plotting
+
+matplotlib.style.use('ggplot')
+
+
+
 dir_path = os.path.dirname(os.path.realpath(__file__))
 s = time.time()
 
@@ -27,7 +36,7 @@ def clamp(lower, val, upper):
 
 global grid 
 grid = np.zeros((32,17))
-h = ax.imshow(grid)
+#h = ax.imshow(grid)
 #Setting up environment
 
 rows = [ (0,13), 
@@ -74,7 +83,7 @@ for i, row in enumerate(rows):
         grid[i][j] = 1
         grid_dict[(i,j)] = 1
 
-h = ax.imshow(grid)
+#h = ax.imshow(grid)
 
 #plt.imshow(np.fliplr(grid))
 #plt.show()
@@ -110,7 +119,7 @@ class RaceTrackenv:
         env.state = next_state
         return next_state, -1, self.done
 
-def make_epsilon_greedy_policy(epsilon, nA):
+def make_epsilon_greedy_policy(epsilon, nA, Q =defaultdict(lambda: np.zeros(nA))):
     """
     Creates an epsilon-greedy policy based on a given Q-function and epsilon.
     
@@ -125,7 +134,6 @@ def make_epsilon_greedy_policy(epsilon, nA):
         the probabilities for each action in the form of a numpy array of length nA.
     
     """
-    Q = defaultdict(lambda: np.zeros(nA))
 
     def policy_fn(state):
         new_policy = np.zeros(nA)
@@ -241,15 +249,114 @@ def mc_control_importance_sampling(env, num_episodes, behavior_policy, Q, C, dis
 
     return Q, C, target_policy
 
+def q_learning(env, num_episodes, Q, discount_factor=1.0, alpha=0.5, epsilon=0.1):
+    """
+    Q-Learning algorithm: Off-policy TD control. Finds the optimal greedy policy
+    while following an epsilon-greedy policy
+    
+    Args:
+        env: OpenAI environment.
+        num_episodes: Number of episodes to run for.
+        discount_factor: Gamma discount factor.
+        alpha: TD learning rate.
+        epsilon: Chance to sample a random action. Float between 0 and 1.
+    
+    Returns:
+        A tuple (Q, episode_lengths).
+        Q is the optimal action-value function, a dictionary mapping state -> action values.
+        stats is an EpisodeStats object with two numpy arrays for episode_lengths and episode_rewards.
+    """
+    
+    # The final action-value function.
+    # A nested dictionary that maps state -> (action -> action-value).
+
+    # Keeps track of useful statistics
+    stats = plotting.EpisodeStats(
+        episode_lengths=np.zeros(num_episodes),
+        episode_rewards=np.zeros(num_episodes))    
+    
+    # The policy we're following
+    policy = make_epsilon_greedy_policy(epsilon, len(env.action_space), Q)
+    t = 0 
+    for i_episode in range(num_episodes):
+        # Print out which episode we're on, useful for debugging.
+        if (i_episode + 1) % 1 == 0:
+            print(i_episode, t)
+        state = env.reset()
+        t = 0
+        while True:
+            action = np.random.choice(range(len(env.action_space)), p=policy(state))
+            next_state, reward, done = env.step(action)
+            maxQ_action = np.argmax(Q[next_state]) 
+            # Update statistics
+            stats.episode_rewards[i_episode] += reward
+            stats.episode_lengths[i_episode] = t
+            Q[state][action] += alpha * (reward + discount_factor * Q[next_state][maxQ_action] - Q[state][action])
+            state = next_state
+            #point = state[0]
+            #grid[point[0]][point[1]] = 0
+            #h.set_data(np.fliplr(grid))
+            #draw(), pause(1e-3)
+            #grid[point[0]][point[1]] = 1
+            
+            if done:
+                break
+            t += 1
+
+    return Q, stats
+
 
 
 env = RaceTrackenv(start, end, grid, grid_dict)
+#Q= defaultdict(lambda: np.zeros(len(env.action_space)))
+a_file = open(dir_path + "\Q2_dict", "rb")
+Q= defaultdict(lambda: np.zeros(len(env.action_space)),pickle.load(a_file))
+'''
+Q1, stats = q_learning(env,10000, Q, 1, 0.5, 0.01)
+
+new_Q1 = {key:Q1[key] for key in Q1}
+
+Q_dict = open(dir_path + '\Q2_dict', 'wb')
+pickle.dump(new_Q1, Q_dict)
+Q_dict.close()
+
+plotting.plot_episode_stats(stats)'''
+
+test_start = (31,8)
+
+episode = []
+state = env.reset()
+state = (test_start, (0,0))
+env.state = state
+path = [test_start]
+while True:
+    action = np.argmax(Q[state])
+    next_state, reward, done = env.step(action)
+    episode.append((tuple(state), action, reward))
+    print(np.array((tuple(state), action, reward)))
+    path.append(next_state[0])
+    if done:
+        break
+    state = next_state
+
+
+
+print(path)
+
+for point in path:
+    grid[point[0]][point[1]] = 0
+
+
+plt.imshow(np.fliplr(grid))
+plt.show()
+
+'''
 #Q= defaultdict(lambda: np.zeros(len(env.action_space)))
 a_file = open(dir_path + "\Q_dict", "rb")
 Q= defaultdict(lambda: np.zeros(len(env.action_space)),pickle.load(a_file))
 #C = defaultdict(lambda: np.zeros(len(env.action_space)))
 b_file = open(dir_path + "\C_dict", "rb")
-C= defaultdict(lambda: np.zeros(len(env.action_space)),pickle.load(b_file))
+C= defaultdict(lambda: np.zeros(len(env.action_space)),pickle.load(b_file)
 
 
 epsilon_policy = make_epsilon_greedy_policy(0.9, len(env.action_space))
@@ -272,7 +379,7 @@ C_dict.close()
 f = time.time()
 print(len(new_Q1))
 print(f"Exectuion time: {f-s}")
-'''
+
 Q2, policy2 = mc_control_importance_sampling(env, num_episodes=100, behavior_policy=epsilon_policy2, Q = Q1, discount_factor=0.9)
 
 new_Q2 = {key:Q2[key] for key in Q2}
