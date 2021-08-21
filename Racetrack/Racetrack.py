@@ -311,8 +311,8 @@ env = RaceTrackenv(start, end, grid, grid_dict)
 #Q= defaultdict(lambda: np.zeros(len(env.action_space)))
 a_file = open(dir_path + "\Q2_dict", "rb")
 Q= defaultdict(lambda: np.zeros(len(env.action_space)),pickle.load(a_file))
-'''
-Q1, stats = q_learning(env,10000, Q, 1, 0.5, 0.01)
+
+Q1, stats = q_learning(env,10000, Q, 1, 0.5, 0.5)
 
 new_Q1 = {key:Q1[key] for key in Q1}
 
@@ -320,9 +320,11 @@ Q_dict = open(dir_path + '\Q2_dict', 'wb')
 pickle.dump(new_Q1, Q_dict)
 Q_dict.close()
 
-plotting.plot_episode_stats(stats)'''
+plotting.plot_episode_stats(stats)
 
-test_start = (31,8)
+print(len(Q1))
+
+test_start = (31,10)
 
 episode = []
 state = env.reset()
