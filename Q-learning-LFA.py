@@ -18,11 +18,14 @@ matplotlib.style.use('ggplot')
 
 env = gym.envs.make("MountainCar-v0")
 
+
+
 # Feature Preprocessing: Normalize to zero mean and unit variance
 # We use a few samples from the observation space to do this
 observation_examples = np.array([env.observation_space.sample() for x in range(10000)])
 scaler = sklearn.preprocessing.StandardScaler()
 scaler.fit(observation_examples)
+
 
 # Used to convert a state to a featurized representation.
 # We use RBF kernels with different variances to cover different parts of the space
@@ -75,15 +78,18 @@ class Estimator():
             in the environment where pred[i] is the prediction for action i.
             
         """
-        # TODO: Implement this!
-        return 0 if a else np.zeros(env.action_space.n)
+        features = self.featurize_state(s)
+        if a is None:
+            return [self.models[i].predict([features])[0] for i in range(env.action_space.n)]
+        else:
+            return self.models[a].predict([features])[0]
     
     def update(self, s, a, y):
         """
         Updates the estimator parameters for a given state and action towards
         the target y.
         """
-        # TODO: Implement this!
+        self.models[a].partial_fit([self.featurize_state(s)], [y])
         return None
 
 def make_epsilon_greedy_policy(estimator, epsilon, nA):
@@ -142,7 +148,25 @@ def q_learning(env, estimator, num_episodes, discount_factor=1.0, epsilon=0.1, e
         print("\rEpisode {}/{} ({})".format(i_episode + 1, num_episodes, last_reward), end="")
         sys.stdout.flush()
         
-        # TODO: Implement this!
+        state = env.reset()
+        t = 0
+        action = np.random.choice(range(env.action_space.n), p=policy(state))
+        while True:
+            next_state, reward, done, _ = env.step(action)
+            if done:
+                estimator.update(state, action, reward)
+                break
+            next_action =  np.random.choice(range(env.action_space.n), p=policy(next_state))
+
+            estimator.update(state, action, reward+discount_factor*estimator.predict(next_state, next_action))
+            # Update statistics
+            stats.episode_rewards[i_episode] += reward
+            stats.episode_lengths[i_episode] = t
+
+            state = next_state
+            action = next_action
+
+            t += 1
     
     return stats
 
@@ -152,7 +176,7 @@ estimator = Estimator()
 # Note: For the Mountain Car we don't actually need an epsilon > 0.0
 # because our initial estimate for all states is too "optimistic" which leads
 # to the exploration of all states.
-stats = q_learning(env, estimator, 100, epsilon=0.0)
+stats = q_learning(env, estimator, 1000, epsilon=0.1)
 
 plotting.plot_cost_to_go_mountain_car(env, estimator)
 plotting.plot_episode_stats(stats, smoothing_window=25)
